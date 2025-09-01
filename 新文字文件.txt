@@ -37,11 +37,13 @@ git config --global core.quotepath false
 # 1) 確認目前分支（應該是 main）
 git branch
 
+git status
+
 # 2) 把所有變更都加入（已經 staged 也無妨）
 git add -A
 
 # 3) 建立一個新的 commit
-git commit -m "feat: add prompt.txt & update 會議紀錄.txt"
+git commit -m "小調整"
 
 # 4) 推上遠端 main
 git push origin main
