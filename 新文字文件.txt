@@ -28,3 +28,6 @@ git pull --rebase origin main
 
 # 5) 推上去
 git push
+
+
+--https://2tutbkyzzaqnsgu4hir9cp.streamlit.app/
