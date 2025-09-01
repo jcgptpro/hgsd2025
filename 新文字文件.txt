@@ -1,7 +1,7 @@
 pip install --upgrade -r requirements.txt
 python -m streamlit run app.py
 
-
+--第一次推送
 # 1) 先抓遠端分支
 git fetch origin
 
@@ -12,3 +12,19 @@ git rebase origin/main
 
 # 3) 推送
 git push -u origin main
+
+--之後每次推送
+# 1) 看看有哪些變更（可選）
+git status
+
+# 2) 加入要推的檔案
+git add .            # 或選擇性加入：git add path/to/file
+
+# 3) 建立提交
+git commit -m "說明本次修改重點"
+
+# 4) 先把遠端更新接回來（保持歷史乾淨）
+git pull --rebase origin main
+
+# 5) 推上去
+git push
