@@ -1,2 +1,14 @@
 pip install --upgrade -r requirements.txt
 python -m streamlit run app.py
+
+
+# 1) 先抓遠端分支
+git fetch origin
+
+# 2) 用 rebase 把你的提交接到遠端 main 後面（較乾淨）
+git rebase origin/main
+# 若出現衝突：依檔案解衝突 -> git add <檔案> -> 繼續
+# git rebase --continue
+
+# 3) 推送
+git push -u origin main
