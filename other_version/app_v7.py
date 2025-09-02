@@ -1,3 +1,4 @@
+
 import os
 import io
 import random
@@ -24,21 +25,20 @@ def init_state():
     ss.setdefault("order_code", None)
     ss.setdefault("remarketing_tag", False)
     ss.setdefault("survey_sent", False)
-    # 注意：這裡沿用舊鍵值，稍後在 M3 會做正規化，因此不會再觸發 multiselect 例外
     ss.setdefault("channel_mix", {"FB_動態":35, "IG_限時":25, "Google_搜尋":25, "YouTube_展示":15})
-    ss.setdefault("persona_df", None)
-    ss.setdefault("selected_ta", [])
-    ss.setdefault("selected_ta_sizes", {})
-    ss.setdefault("insight_from_upload", None)
+    ss.setdefault("persona_df", None)            # 原始 Persona DataFrame
+    ss.setdefault("selected_ta", [])             # 被圈選的 TA 名稱
+    ss.setdefault("selected_ta_sizes", {})       # {TA: size}
+    ss.setdefault("insight_from_upload", None)   # 1-3 上傳的名單分析結果
     # AI panels
-    ss.setdefault("show_ai_m11", False)
-    ss.setdefault("chat_m11", [])
-    ss.setdefault("show_ai_m12", False)
+    ss.setdefault("show_ai_m11", False)          # 1-1 AI 討論
+    ss.setdefault("chat_m11", [])                # 1-1 對話紀錄
+    ss.setdefault("show_ai_m12", False)          # 1-2 AI 討論
     ss.setdefault("chat_m12", [])
     # TA 頁：展開更多
     ss.setdefault("m2_expand_more", False)
     # M3 渠道模板（8 渠道，依目標帶預設）
-    ss.setdefault("m3_channel_weights", None)
+    ss.setdefault("m3_channel_weights", None)    # {"FB":..,"Google":..,...}
 
 def gen_order_code():
     ts = datetime.now().strftime("%Y%m%d")
@@ -72,15 +72,23 @@ def ensure_persona_loaded():
             })
 
 def sidebar_brand():
+    # 移除 Logo，只顯示產品名稱與 slogan、公司/會員資訊
     ss = st.session_state
     st.sidebar.markdown(f"### {APP_NAME}")
     st.sidebar.caption(SLOGAN)
     st.sidebar.write(f"**{ss.get('company','')}** · {ss.get('member_tier','')}")
     st.sidebar.divider()
+    # 注入 CSS：去邊框、透明、超緊湊、左對齊
     st.sidebar.markdown("""
         <style>
-        section[data-testid="stSidebar"] div[data-testid="stSidebarContent"]{ padding-top: 6px !important; }
-        section[data-testid="stSidebar"] .stButton { margin-bottom: 2px !important; }
+        /* move sidebar content up */
+        section[data-testid="stSidebar"] div[data-testid="stSidebarContent"]{
+            padding-top: 6px !important;
+        }
+        /* tighter buttons: left align, half spacing */
+        section[data-testid="stSidebar"] .stButton { 
+            margin-bottom: 2px !important;
+        }
         section[data-testid="stSidebar"] .stButton > button {
             width: 100%;
             text-align: left !important;
@@ -90,7 +98,9 @@ def sidebar_brand():
             padding: 2px 4px !important;
             box-shadow: none !important;
         }
-        section[data-testid="stSidebar"] .stButton > button:hover { background: rgba(0,0,0,0.05) !important; }
+        section[data-testid="stSidebar"] .stButton > button:hover {
+            background: rgba(0,0,0,0.05) !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -119,7 +129,8 @@ def nav_button(label, active=False, key=None):
             st.session_state["current_page"] = label
             set_query_page(label)
             st.rerun()
-
+    # 更緊湊的間距（3px）
+    
 def global_sidebar_nav():
     sidebar_brand()
 
@@ -150,6 +161,7 @@ def page_header(title, extra_tag=None):
 UNIT_CTR = {"FB":1.2,"Google":2.2,"Line":1.0,"SMS":0.8,"EDM":1.0,"APP廣告":1.1,"APP任務":0.9,"APP Push":1.3}
 UNIT_CPA = {"FB":140,"Google":110,"Line":160,"SMS":180,"EDM":170,"APP廣告":150,"APP任務":190,"APP Push":160}
 
+# 媒體每日報價（示意，TWD）
 DAY_RATE = {
     "FB":28000, "Google":32000, "Line":22000, "SMS":15000,
     "EDM":18000, "APP廣告":26000, "APP任務":20000, "APP Push":17000
@@ -186,41 +198,6 @@ GOAL_TEMPLATES = {
     "名單": {"Google":30,"FB":25,"EDM":15,"Line":10,"SMS":10,"APP任務":5,"APP Push":3,"APP廣告":2},
     "購買": {"Google":35,"FB":20,"EDM":15,"Line":10,"APP Push":8,"SMS":5,"APP廣告":5,"APP任務":2},
 }
-
-# ---------- Normalize (legacy -> canonical channels) ----------
-
-LEGACY_CH_MAP = {
-    "FB_動態": "FB",
-    "IG_限時": "FB",           # IG 歸入 FB 類型
-    "Google_搜尋": "Google",
-    "YouTube_展示": "Google",   # YouTube 歸入 Google 類型
-}
-
-def normalize_channel_weights(weights: dict) -> dict:
-    """
-    將任意渠道鍵（包含舊版：FB_動態、IG_限時、Google_搜尋、YouTube_展示）
-    轉換為 8 大標準渠道 CHANNELS_8，並合併權重；忽略未知鍵。
-    """
-    std = {ch: 0 for ch in CHANNELS_8}
-    if not isinstance(weights, dict):
-        return std
-    for k, v in (weights or {}).items():
-        key = k if k in std else LEGACY_CH_MAP.get(k)
-        if key in std:
-            try:
-                val = int(v)
-            except Exception:
-                val = 0
-            std[key] += max(val, 0)
-    # 若全部為 0，回退到目標模板（若可用）
-    if sum(std.values()) == 0:
-        try:
-            tmpl = channel_defaults_from_goal()
-            for ch in std:
-                std[ch] = int(tmpl.get(ch, 0))
-        except Exception:
-            pass
-    return std
 
 def init_m3_channels_from_goal(goal):
     weights = GOAL_TEMPLATES.get(goal, GOAL_TEMPLATES["曝光"]).copy()
@@ -268,6 +245,7 @@ def m1_page():
             end_d = col2.date_input("檔期（結束）", value=date.today() + timedelta(days=13), key="m11_end")
             forbidden = st.text_input("禁語/語氣（選填）", placeholder="例如：無療效宣稱、避免醫療用語…", key="m11_forbid")
 
+        # AI 討論（避免 modal，相容）
         if st.button("與 AI 討論提案", key="m11_ai_btn"):
             st.session_state["show_ai_m11"] = True
 
@@ -294,6 +272,7 @@ def m1_page():
         st.subheader("渠道配比（可調整，將連動報價）")
         goal_for_mix = st.session_state.get("m11_goal","曝光")
         default_mix = st.session_state.get("channel_mix") or GOAL_TEMPLATES.get(goal_for_mix, GOAL_TEMPLATES["曝光"]).copy()
+        # 確保 8 渠道都存在鍵
         for ch in CHANNELS_8:
             default_mix.setdefault(ch, 0)
         mix = default_mix
@@ -305,6 +284,7 @@ def m1_page():
             st.warning(f"目前合計：{total}%（建議調整為 100%）")
         st.session_state["channel_mix"] = mix
 
+        # ---- 新：預估報價（連動 檔期天數 × 渠道配比） ----
         days = (st.session_state.get("m11_end") - st.session_state.get("m11_start")).days + 1
         days = max(days, 1)
         quote, quote_breakdown = quote_by_days_and_mix(days, mix)
@@ -313,6 +293,7 @@ def m1_page():
         cA, cB, cC = st.columns(3)
         cA.metric("檔期天數", days)
         cB.metric("預估報價 (TWD)", f"{quote:,}")
+        # 成效估算沿用既有 budget（視為客戶預算）
         est = estimate_by_mix(st.session_state.get("m11_budget", 0), mix)
         cC.metric("預估 CTR(%)", est["CTR"])
         cA.metric("預估 CPA", est["CPA"])
@@ -324,6 +305,7 @@ def m1_page():
         if st.button("生成正式委刊單（含追蹤代碼）", key="m11_gen_io"):
             st.session_state["order_code"] = gen_order_code()
             st.success(f"已產生正式委刊單，追蹤代碼：{st.session_state['order_code']}")
+            # 初始化 M3 渠道模板（依目標）
             init_m3_channels_from_goal(st.session_state.get("m11_goal","曝光"))
 
     # ---- Tab 1-2 市調提案 ----
@@ -366,6 +348,7 @@ def m1_page():
                     st.session_state["show_ai_m12"] = False
                     st.rerun()
 
+        # 僅能生成委刊單，不再提供跳 TA 的按鈕
         if st.button("生成正式委刊單（含追蹤代碼）", key="m12_gen_io"):
             st.session_state["order_code"] = gen_order_code()
             st.success(f"已產生正式委刊單，追蹤代碼：{st.session_state['order_code']}")
@@ -404,7 +387,7 @@ def m1_page():
         st.multiselect("資料來源", ["會員/銷售","投放數據","市調回收","OpenData","其他"], key="m14_srcs")
         st.button("送出需求", key="m14_submit")
 
-# ---------- Module 2：TA 預測與圈選 ----------
+# ---------- Module 2：TA 預測與圈選（AI 推薦 + 展開更多；需追蹤代碼） ----------
 
 def normalize_persona(df):
     cols = df.columns.tolist()
@@ -453,13 +436,16 @@ def normalize_persona(df):
         items.append({"name":name,"size":size,"pain":pain,"keywords":kw,"slots":slot,"attitudes":attitudes})
     return items
 
+
 def pick_ai_recommended_personas(items, industry, goal, k=5):
+    # 簡易規則：依關鍵字與痛點/態度對應產業與目標做打分，取前 k
     scores = []
     ind_kw = str(industry or "").lower()
     goal_kw = str(goal or "").lower()
     for it in items:
         s = 0
         text = (it["name"]+" "+it["pain"]+" "+it["keywords"]+" "+it["slots"]+" "+it["attitudes"]).lower()
+        # 產業關聯度
         if "美妝" in ind_kw or "beauty" in ind_kw:
             s += ("妝" in text) * 2 + ("女性" in text) * 1
         if "家電" in ind_kw or "appliance" in ind_kw:
@@ -472,12 +458,14 @@ def pick_ai_recommended_personas(items, industry, goal, k=5):
             s += ("健身" in text) * 3 + ("效率" in text)*1
         if "fmcg" in ind_kw:
             s += ("比價" in text) * 1 + ("促銷" in text)*1
+        # 目標關聯度
         if "曝光" in goal_kw:
             s += ("社群" in text) + ("口碑" in text) + ("年輕" in text)
         if "名單" in goal_kw:
             s += ("搜尋" in text) + ("關鍵字" in text) + ("line" in text) + ("edm" in text)
         if "購買" in goal_kw:
             s += ("比價" in text) + ("功能" in text) + ("評價" in text)
+        # 規模微調
         s += min(it["size"]/200000, 1.0)
         scores.append((s, it))
     scores.sort(key=lambda x: x[0], reverse=True)
@@ -486,6 +474,7 @@ def pick_ai_recommended_personas(items, industry, goal, k=5):
 def m2_page():
     page_header("TA 預測與圈選", extra_tag=(f"追蹤代碼 {st.session_state['order_code']}" if st.session_state.get("order_code") else None))
 
+    # 追蹤代碼 gating
     if not st.session_state.get("order_code"):
         st.info("要開始圈選 TA，請先在「提案目標與報價」或「市調提案」生成正式委刊單（追蹤代碼）。")
         return
@@ -517,6 +506,7 @@ def m2_page():
         st.markdown("#### 更多 Persona")
         grid = st.columns(3)
         for idx, it in enumerate(items):
+            # 跳過已在推薦中出現的
             if any(it['name']==r['name'] for r in recs): 
                 continue
             with grid[idx % 3]:
@@ -529,6 +519,7 @@ def m2_page():
                     if it['name'] in selections:
                         selections.discard(it['name']); sizes_map.pop(it['name'], None)
 
+    # 已選合計
     total_size = sum(sizes_map.get(name, 0) for name in selections)
     st.info(f"已選 TA：**{len(selections)}** 個｜合計人數：約 **{total_size:,}** 人（示意）")
     st.session_state["selected_ta"] = list(selections)
@@ -575,12 +566,14 @@ def m3_page():
 
     with tabs[0]:
         st.subheader("選擇渠道與版位（依提案目標預設配比，可調整）")
-        # 先取得配比（若有舊版鍵，轉成 8 大渠道）
-        raw_weights = st.session_state.get("channel_mix") or channel_defaults_from_goal().copy()
-        weights = normalize_channel_weights(raw_weights)
+        # 如果 1-1（媒體提案）已經有最後定案的配比，就優先沿用；否則退回目標模板
+        if st.session_state.get("channel_mix"):
+            weights = st.session_state["channel_mix"].copy()
+        else:
+            weights = channel_defaults_from_goal().copy()
 
-        # 預設勾選：只取目前選項中的渠道
-        default_selected = [ch for ch, w in weights.items() if ch in CHANNELS_8 and w > 0]
+        # 預設勾選：配比 > 0 的渠道
+        default_selected = [ch for ch, w in weights.items() if w and w > 0]
         selected = st.multiselect("選擇渠道", CHANNELS_8, default=default_selected, key="m31_channels")
 
         # 每個選中的渠道配比（%）
@@ -676,7 +669,9 @@ def m3_page():
         c1.button("AI 產生題組", key="m32_ai_gen")
         c2.button("匯入樣板", key="m32_import")
         c3.button("預覽", key="m32_preview")
+        # 新增：請虛擬消費者作答（模擬）
         if c4.button("請虛擬消費者作答", key="m32_simulate"):
+            # 產生模擬回覆（示意）
             rng = np.random.default_rng(99)
             n = 120
             ta_list = st.session_state.get("selected_ta", [])
@@ -691,7 +686,7 @@ def m3_page():
             st.download_button("下載 simulated_answers.csv", data=df_ans.to_csv(index=False), file_name="simulated_answers.csv")
         st.caption("＊示意資料，日後可替換為真 AI 生成或 Panel 收集。")
 
-# ---------- Module 4：成效與顧客洞察 ----------
+# ---------- Module 4：成效與顧客洞察（新增 多張分析圖 + 顧客洞察 子頁） ----------
 
 def random_kpi():
     rng = np.random.default_rng(42)
@@ -722,6 +717,7 @@ def gen_daily_perf(days=14, channels=CHANNELS_8, seed=123):
     rng = np.random.default_rng(seed)
     start = date.today() - timedelta(days=days-1)
     rows = []
+    # 基於模板權重生成每日數據
     weights = st.session_state.get("m31_weights") or {ch: 100/len(channels) for ch in channels}
     wsum = sum(weights.values()) or 1
     for i in range(days):
@@ -754,6 +750,7 @@ def gen_customer_insight_data(seed=123):
 def m4_page():
     page_header("成效與顧客洞察")
     tabs = st.tabs(["媒體投放成效與洞察","顧客洞察","市調回收成效"])
+    # --- 投放成效 ---
     with tabs[0]:
         st.subheader("KPI 摘要")
         kpi = random_kpi()
@@ -767,14 +764,17 @@ def m4_page():
 
         st.subheader("投放趨勢與表現（示意）")
         perf = gen_daily_perf(days=14)
+        # 日趨勢
         st.markdown("**日趨勢：曝光 / 點擊 / 轉換**")
         trend = perf.groupby("date")[["impressions","clicks","conversions"]].sum()
         st.line_chart(trend)
 
+        # 渠道堆疊（花費）
         st.markdown("**每日花費 × 渠道（堆疊）**")
         pivot_spend = perf.pivot_table(index="date", columns="channel", values="spend", aggfunc="sum").fillna(0)
         st.area_chart(pivot_spend)
 
+        # 各渠道 CTR / CPA
         st.markdown("**各渠道 CTR / CPA**")
         sum_ch = perf.groupby("channel").sum(numeric_only=True)
         ctr_ch = (sum_ch["clicks"]/sum_ch["impressions"]).fillna(0)*100
@@ -782,11 +782,13 @@ def m4_page():
         st.bar_chart(pd.DataFrame({"CTR(%)":ctr_ch.sort_values(ascending=False)}))
         st.bar_chart(pd.DataFrame({"CPA":cpa_ch.sort_values()}))
 
+        # 文案×版型熱點圖（用 matrix_sample）
         st.markdown("**文案 × 圖片版型 熱點圖（CTR，示意）**")
         mat = matrix_sample()
         heat = mat.pivot_table(index="文案", columns="圖片版型", values="CTR(%)", aggfunc="mean")
+                # 嘗試使用背景漸層（需要 matplotlib），否則退回 Altair 熱點圖
         try:
-            import matplotlib  # noqa
+            import matplotlib  # noqa: F401
             st.dataframe(heat.style.background_gradient(cmap="YlOrRd"))
         except Exception:
             st.caption("提示：未安裝 matplotlib，改以 Altair 呈現熱點圖。")
@@ -809,6 +811,7 @@ def m4_page():
             set_query_page("📝 提案目標與報價")
             st.rerun()
 
+    # --- 顧客洞察 ---
     with tabs[1]:
         st.subheader("成交顧客概況（示意）")
         total, trend, gender, age, cities_ser, cats_ser, ch_ser = gen_customer_insight_data()
@@ -816,6 +819,7 @@ def m4_page():
         c1.metric("成交顧客數（近期）", f"{total:,}", f"{'+' if trend>=0 else ''}{trend}%")
         c2.metric("Top 城市", cities_ser.sort_values(ascending=False).index[0])
         st.markdown("##### 性別分佈")
+        import altair as alt
         _gdf = gender.reset_index().rename(columns={"index":"性別",0:"人數"}) if hasattr(gender,"reset_index") else gender
         try:
             _gdf = _gdf.rename(columns={_gdf.columns[0]:"性別", _gdf.columns[1]:"人數"})
@@ -829,6 +833,7 @@ def m4_page():
         )
         st.altair_chart(pie, use_container_width=True)
         st.markdown("##### 年齡層分佈")
+        import altair as alt
         _adf = age.reset_index().rename(columns={"index":"年齡層",0:"人數"}) if hasattr(age,"reset_index") else age
         try:
             _adf = _adf.rename(columns={_adf.columns[0]:"年齡層", _adf.columns[1]:"人數"})
@@ -848,6 +853,7 @@ def m4_page():
         st.markdown("##### 交易通路排行（Top 10）")
         st.bar_chart(ch_ser.head(10))
 
+    # --- 市調回收成效 ---
     with tabs[2]:
         st.subheader("市調回收成效（示意）")
         if st.session_state.get("survey_sent"):
@@ -863,7 +869,7 @@ def m4_page():
         st.download_button("下載 open_coding.csv", data=codes.to_csv(index=False), file_name="open_coding.csv", key="m42_dl_coding")
         st.write("AI 態度標籤雲：正面 63%｜中立 28%｜負面 9%")
 
-# ---------- Module 5：忠誠與再行銷 ----------
+# ---------- Module 5：忠誠與再行銷（各子頁加 AI 洞察建議） ----------
 
 def loyalty_ai_tips(industry, ta_list, topic):
     base = ["以 Line+EDM 建立固定節奏", "針對高價值客戶推出 VIP 體驗", "APP Push 搭配限時碼提升回流"]
@@ -928,9 +934,10 @@ def m5_page():
             set_query_page("📝 提案目標與報價")
             st.rerun()
 
-# ---------- Module 6：產業與市場洞察 ----------
+# ---------- Module 6：產業與市場洞察（各子頁加 AI 洞察建議） ----------
 
 def ai_insights_for_industry(industry, ta_list):
+    # 規則生成 3-5 條建議
     tips = []
     if industry in ["美妝","保養","美容保養"]:
         tips += ["以IG/FB短句口碑與前後對比呈現","鎖定25–34女性，強調妝容持久與敏感肌安心"]
@@ -1018,7 +1025,7 @@ def m7_page():
     })
     st.dataframe(bills)
 
-# ---------- Module 8：Account ----------
+# ---------- Module 8：Account（含 會員升級） ----------
 
 def m8_page():
     page_header("Account")
