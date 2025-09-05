@@ -10,7 +10,7 @@ from datetime import datetime, date, timedelta
 from PIL import Image, ImageDraw, ImageFont
 import altair as alt
 
-APP_NAME = "Happy Go CRM+"
+APP_NAME = "HAPPYGO CRM+"
 SLOGAN = "我們最懂您的客戶與幫助您成長。"
 
 # ------------------------ State & Utils ------------------------
@@ -86,7 +86,7 @@ def sidebar_brand():
             padding-top: 6px !important;
         }
         /* tighter buttons: left align, half spacing */
-        section[data-testid="stSidebar"] .stButton { 
+        section[data-testid="stSidebar"] .stButton {
             margin-bottom: 2px !important;
         }
         section[data-testid="stSidebar"] .stButton > button {
@@ -508,7 +508,7 @@ def m2_page():
         grid = st.columns(3)
         for idx, it in enumerate(items):
             # 跳過已在推薦中出現的
-            if any(it['name']==r['name'] for r in recs): 
+            if any(it['name']==r['name'] for r in recs):
                 continue
             with grid[idx % 3]:
                 st.markdown(f"**{it['name']}**  · 規模：約 {it['size']:,}")

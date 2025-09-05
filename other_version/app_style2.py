@@ -30,7 +30,7 @@ def apply_theme_and_css():
     # Global CSS (sidebar spacing, neon indicators, dark inputs, primary buttons)
     st.markdown("""
     <style>
-    main[data-testid="stAppViewContainer"] { 
+    main[data-testid="stAppViewContainer"] {
       background: radial-gradient(1200px 600px at 10% -10%, rgba(59,130,246,0.10), transparent 60%),
                   radial-gradient(1000px 500px at 90% 10%, rgba(124,58,237,0.08), transparent 60%),
                   #0B1220;
@@ -59,7 +59,7 @@ def apply_theme_and_css():
       background: linear-gradient(90deg,#2563EB,#06B6D4) !important; border:0!important; color:white!important;
     }
     /* Sticky summary card */
-    .hg-sticky { position: fixed; right: 18px; top: 92px; width: 320px; 
+    .hg-sticky { position: fixed; right: 18px; top: 92px; width: 320px;
       background: rgba(15,23,42,0.75); border:1px solid #1F2A44; border-radius:14px; padding:12px 14px;
       backdrop-filter: blur(6px); z-index: 9999; color:#E5E7EB;
       box-shadow: 0 8px 24px rgba(0,0,0,.35);
@@ -127,7 +127,7 @@ def render_fixed_summary(which="m1"):
 
 import altair as alt
 
-APP_NAME = "Happy Go CRM+"
+APP_NAME = "HAPPYGO CRM+"
 SLOGAN = "我們最懂您的客戶與幫助您成長。"
 
 # ------------------------ State & Utils ------------------------
@@ -588,7 +588,7 @@ def _orig_m2_page():
         grid = st.columns(3)
         for idx, it in enumerate(items):
             # 跳過已在推薦中出現的
-            if any(it['name']==r['name'] for r in recs): 
+            if any(it['name']==r['name'] for r in recs):
                 continue
             with grid[idx % 3]:
                 st.markdown(f"**{it['name']}**  · 規模：約 {it['size']:,}")
@@ -1185,4 +1185,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -7,7 +7,7 @@ import io
 import random
 import string
 
-APP_NAME = "Happy Go CRM+"
+APP_NAME = "HAPPYGO CRM+"
 SLOGAN = "我們最懂您的客戶與幫助您成長。"
 
 # ---------- Utilities ----------

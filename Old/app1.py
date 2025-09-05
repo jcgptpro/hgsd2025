@@ -8,7 +8,7 @@ import numpy as np
 from datetime import datetime, date
 from PIL import Image, ImageDraw, ImageFont
 
-APP_NAME = "Happy Go CRM+"
+APP_NAME = "HAPPYGO CRM+"
 SLOGAN = "我們最懂您的客戶與幫助您成長。"
 
 # ------------------------ State & Utils ------------------------
